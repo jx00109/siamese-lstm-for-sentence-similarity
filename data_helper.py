@@ -7,7 +7,7 @@ with open('./data/dwords.p', 'rb') as f:
     dtr = pkl.load(f)
 
 
-def load_set(embed, datapath):
+def load_set(embed, datapath, embed_dim):
     with open(datapath, 'rb') as f:
         mylist = pkl.load(f)
     s0 = []
@@ -18,7 +18,7 @@ def load_set(embed, datapath):
         s1x = each[1]
         label = each[2]
         score = float(label)
-        labels.append(np.array(score))
+        labels.append(score)
         for i, ss in enumerate([s0x, s1x]):
             words = word_tokenize(ss)
             index = []
@@ -28,7 +28,7 @@ def load_set(embed, datapath):
                 elif word in embed.vocab:
                     index.append(embed[word])
                 else:
-                    index.append(np.zeros(300, dtype=float))
+                    index.append(np.zeros(embed_dim, dtype=float))
 
             if i == 0:
                 s0.append(np.array(index, dtype=float))
@@ -39,11 +39,9 @@ def load_set(embed, datapath):
 
 
 # 从文件中读取数据集，并分为训练、验证和测试集合
-def load_data(max_len, embed, datapath):
-    train_set = load_set(embed, datapath=datapath)
-
+def load_data(max_len, embed, datapath, embed_dim):
+    train_set = load_set(embed, datapath, embed_dim)
     train_set_x1, train_set_x2, train_set_y = train_set
-
     # train_set length
     n_samples = len(train_set_x1)
 
@@ -58,8 +56,8 @@ def load_data(max_len, embed, datapath):
     train_set = [train_set_x1, train_set_x2, train_set_y]
 
     # 创建用于存放训练、测试和验证集的矩阵
-    new_train_set_x1 = np.zeros([len(train_set[0]), max_len, 300], dtype=float)
-    new_train_set_x2 = np.zeros([len(train_set[0]), max_len, 300], dtype=float)
+    new_train_set_x1 = np.zeros([len(train_set[0]), max_len, embed_dim], dtype=float)
+    new_train_set_x2 = np.zeros([len(train_set[0]), max_len, embed_dim], dtype=float)
     new_train_set_y = np.zeros(len(train_set[0]), dtype=float)
     mask_train_x1 = np.zeros([len(train_set[0]), max_len])
     mask_train_x2 = np.zeros([len(train_set[0]), max_len])
@@ -69,19 +67,19 @@ def load_data(max_len, embed, datapath):
         for i, (x1, x2, y) in enumerate(zip(x1, x2, y)):
             # whether to remove sentences with length larger than maxlen
             if len(x1) <= max_len:
-                new_x1[i, 0:len(x1), :] = x1
+                new_x1[i, 0:len(x1)] = x1
                 new_mask_x1[i, len(x1) - 1] = 1
                 new_y[i] = y
             else:
-                new_x1[i, :, :] = (x1[0:max_len:300])
+                new_x1[i, :, :] = (x1[0:max_len:embed_dim])
                 new_mask_x1[i, max_len - 1] = 1
                 new_y[i] = y
             if len(x2) <= max_len:
-                new_x2[i, 0:len(x2), :] = x2
+                new_x2[i, 0:len(x2)] = x2
                 new_mask_x2[i, len(x2) - 1] = 1  # 标记句子的结尾
                 new_y[i] = y
             else:
-                new_x2[i, :, :] = (x2[0:max_len:300])
+                new_x2[i, :, :] = (x2[0:max_len:embed_dim])
                 new_mask_x2[i, max_len - 1] = 1
                 new_y[i] = y
         new_set = [new_x1, new_x2, new_y, new_mask_x1, new_mask_x2]
