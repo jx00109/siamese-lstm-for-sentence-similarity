@@ -132,6 +132,7 @@ def train_step():
     # gpu_config=tf.ConfigProto()
     # gpu_config.gpu_options.allow_growth=True
     with tf.Graph().as_default(), tf.Session() as session:
+        # 这个初始化不好，效果极差
         initializer = tf.random_normal_initializer(0.0, 0.2, dtype=tf.float32)
         with tf.variable_scope("model", reuse=None, initializer=initializer):
             model = LSTMRNN(config=config, sess=session, is_training=True)
@@ -163,21 +164,20 @@ def train_step():
         pretrained_word_model = KeyedVectors.load_word2vec_format('./GoogleNews-vectors-negative300.bin.gz',
                                                                   binary=True)
 
-        pre_train_data = data_helper.load_data(FLAGS.max_len, pretrained_word_model, datapath='./data/stsallrmf.p')
-        data = data_helper.load_data(FLAGS.max_len, pretrained_word_model, datapath='./data/semtrain.p')
-        test_data = data_helper.load_data(FLAGS.max_len, pretrained_word_model, datapath='./data/semtest.p')
+        pre_train_data = data_helper.load_data(FLAGS.max_len, pretrained_word_model, datapath='./data/stsallrmf.p',
+                                               embed_dim=FLAGS.emdedding_dim)
+        data = data_helper.load_data(FLAGS.max_len, pretrained_word_model, datapath='./data/semtrain.p',
+                                     embed_dim=FLAGS.emdedding_dim)
+        test_data = data_helper.load_data(FLAGS.max_len, pretrained_word_model, datapath='./data/semtest.p',
+                                          embed_dim=FLAGS.emdedding_dim)
 
         print("length of pre-train set:", len(pre_train_data[0]))
-
         print("length of train set:", len(data[0]))
-
         print("length of test set:", len(test_data[0]))
-
         print("begin pre-training")
 
         for i in range(70):
             print("the %d epoch pre-training..." % (i + 1))
-
             lr = model.assign_new_lr(session, config.lr)
             print("current learning rate is %f" % lr)
 
