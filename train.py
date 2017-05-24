@@ -6,6 +6,7 @@ import time
 from lstmRNN import LSTMRNN
 import data_helper
 from gensim.models.word2vec import KeyedVectors
+from scipy.stats import pearsonr
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
@@ -76,7 +77,7 @@ def cut_data(data, rate):
 def evaluate(model, session, data, global_steps=None, summary_writer=None):
     x1, x2, y, mask_x1, mask_x2 = data
 
-    fetches = [model.truecost, model.pearson_r]
+    fetches = [model.truecost, model.sim, model.target]
     feed_dict = {}
     feed_dict[model.input_data_s1] = x1
     feed_dict[model.input_data_s2] = x2
@@ -84,7 +85,9 @@ def evaluate(model, session, data, global_steps=None, summary_writer=None):
     feed_dict[model.mask_s1] = mask_x1
     feed_dict[model.mask_s2] = mask_x2
     model.assign_new_batch_size(session, len(x1))
-    cost, pearson_r = session.run(fetches, feed_dict)
+    cost, sim, target = session.run(fetches, feed_dict)
+
+    pearson_r = pearsonr(sim, target)
 
     dev_summary = tf.summary.scalar('dev_pearson_r', pearson_r)
 
@@ -106,8 +109,10 @@ def run_epoch(model, session, data, global_steps, valid_model, valid_data, train
         feed_dict[model.mask_s1] = mask_s1
         feed_dict[model.mask_s2] = mask_s2
         model.assign_new_batch_size(session, len(s1))
-        fetches = [model.truecost, model.pearson_r, model.train_op, model.summary]
-        cost, peason_r, _, summary = session.run(fetches, feed_dict)
+        fetches = [model.truecost, model.sim, model.target, model.train_op, model.summary]
+        cost, sim, target, _, summary = session.run(fetches, feed_dict)
+
+        pearson_r = pearsonr(sim, target)
 
         train_summary_writer.add_summary(summary, global_steps)
         train_summary_writer.flush()
@@ -117,7 +122,7 @@ def run_epoch(model, session, data, global_steps, valid_model, valid_data, train
                                                    valid_summary_writer)
             print(
                 "the %i step, train cost is: %f and the train pearson_r is %f and the valid cost is %f the valid pearson_r is %f" % (
-                    global_steps, cost, peason_r, valid_cost, valid_pearson_r))
+                    global_steps, cost, pearson_r, valid_cost, valid_pearson_r))
 
         global_steps += 1
 
