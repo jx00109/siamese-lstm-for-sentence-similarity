@@ -5,19 +5,20 @@ import tensorflow as tf
 class LSTMRNN(object):
     def singleRNN(self, x, scope, cell='lstm', reuse=None):
         if cell == 'gru':
-            with tf.variable_scope('grucell' + scope, reuse=reuse):
+            with tf.variable_scope('grucell' + scope, reuse=reuse, dtype=tf.float64):
                 used_cell = tf.contrib.rnn.GRUCell(self.hidden_neural_size, reuse=tf.get_variable_scope().reuse)
 
         else:
-            with tf.variable_scope('lstmcell' + scope, reuse=reuse):
+            with tf.variable_scope('lstmcell' + scope, reuse=reuse, dtype=tf.float64):
                 used_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_neural_size, forget_bias=1.0, state_is_tuple=True,
                                                          reuse=tf.get_variable_scope().reuse)
 
-        with tf.variable_scope('cell_init_state' + scope, reuse=reuse):
-            self.cell_init_state = used_cell.zero_state(self.batch_size, dtype=tf.float32)
+        with tf.variable_scope('cell_init_state' + scope, reuse=reuse, dtype=tf.float64):
+            self.cell_init_state = used_cell.zero_state(self.batch_size, dtype=tf.float64)
 
-        with tf.name_scope('RNN_' + scope), tf.variable_scope('RNN_' + scope):
-            outs, _ = tf.nn.dynamic_rnn(used_cell, x, initial_state=self.cell_init_state, time_major=False)
+        with tf.name_scope('RNN_' + scope), tf.variable_scope('RNN_' + scope, dtype=tf.float64):
+            outs, _ = tf.nn.dynamic_rnn(used_cell, x, initial_state=self.cell_init_state, time_major=False,
+                                        dtype=tf.float64)
         return outs
 
     def __init__(self, config, sess, is_training=True):
@@ -26,11 +27,11 @@ class LSTMRNN(object):
 
         num_step = config.num_step
         embed_dim = config.embed_dim
-        self.input_data_s1 = tf.placeholder(tf.float32, [None, num_step, embed_dim])
-        self.input_data_s2 = tf.placeholder(tf.float32, [None, num_step, embed_dim])
-        self.target = tf.placeholder(tf.float32, [None])
-        self.mask_s1 = tf.placeholder(tf.float32, [None, num_step])
-        self.mask_s2 = tf.placeholder(tf.float32, [None, num_step])
+        self.input_data_s1 = tf.placeholder(tf.float64, [None, num_step, embed_dim])
+        self.input_data_s2 = tf.placeholder(tf.float64, [None, num_step, embed_dim])
+        self.target = tf.placeholder(tf.float64, [None])
+        self.mask_s1 = tf.placeholder(tf.float64, [None, num_step])
+        self.mask_s2 = tf.placeholder(tf.float64, [None, num_step])
 
         self.hidden_neural_size = config.hidden_neural_size
         self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
@@ -61,9 +62,9 @@ class LSTMRNN(object):
             self.sim = tf.clip_by_value(tf.exp(-1.0 * diff), 1e-7, 1.0 - 1e-7)
             self.loss = tf.square(tf.subtract(self.sim, tf.clip_by_value((self.target - 1.0) / 4.0, 1e-7, 1.0 - 1e-7)))
 
-        with tf.name_scope('pearson_r'):
-            _, self.pearson_r = tf.contrib.metrics.streaming_pearson_correlation(self.sim * 4.0 + 1.0, self.target)
-            sess.run(tf.local_variables_initializer())
+        # with tf.name_scope('pearson_r'):
+        #     _, self.pearson_r = tf.contrib.metrics.streaming_pearson_correlation(self.sim * 4.0 + 1.0, self.target)
+        #     sess.run(tf.local_variables_initializer())
 
         with tf.name_scope('cost'):
             self.cost = tf.reduce_mean(self.loss)
@@ -71,7 +72,7 @@ class LSTMRNN(object):
 
         # add summary
         cost_summary = tf.summary.scalar('cost_summary', self.cost)
-        r_summary = tf.summary.scalar('r_summary', self.pearson_r)
+        # r_summary = tf.summary.scalar('r_summary', self.pearson_r)
         mse_summary = tf.summary.scalar('mse_summary', self.truecost)
 
         if not is_training:
@@ -92,14 +93,14 @@ class LSTMRNN(object):
                 grad_summaries.append(sparsity_summary)
         self.grad_summaries_merged = tf.summary.merge(grad_summaries)
         self.summary = tf.summary.merge(
-            [cost_summary, r_summary, mse_summary, self.grad_summaries_merged])
+            [cost_summary, mse_summary, self.grad_summaries_merged])
 
-        optimizer = tf.train.AdadeltaOptimizer(learning_rate=self.lr)
+        optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.0001, epsilon=1e-6)
 
         with tf.name_scope('train'):
             self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
-        self.new_lr = tf.placeholder(tf.float32, shape=[], name="new_learning_rate")
+        self.new_lr = tf.placeholder(tf.float64, shape=[], name="new_learning_rate")
         self._lr_update = tf.assign(self.lr, self.new_lr)
 
     def assign_new_lr(self, session, lr_value):
