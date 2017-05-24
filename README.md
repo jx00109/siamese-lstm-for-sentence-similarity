@@ -13,3 +13,5 @@ pre-trained word2vec model
 (GoogleNews-vectors-negative300.bin.gz)
 
 from https://code.google.com/archive/p/word2vec/ 
+
+2017-5-24 update:change dtype from tf.float32 to tf.float64
